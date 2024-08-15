@@ -1,0 +1,13 @@
+# Generators
+abc
+
+# Ospray Studio
+ospray
+ospray-studio
+ospray-studio-deps
+
+# PBRT
+pbrt
+
+# Temp files
+imgui.ini
