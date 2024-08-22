@@ -11,3 +11,9 @@ pbrt
 
 # Temp files
 imgui.ini
+
+# Generated images
+images/
+
+# Saved images
+output/
