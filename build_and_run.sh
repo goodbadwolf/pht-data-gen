@@ -9,33 +9,42 @@ build() {
     return 0
 }
 
-run() {
-    local mode=$1
-    local scene=$2
-    local spp=$3
+mode="pht"
+scene="wavelet"
+spp="4"
+dev_mode=false
 
+run() {
     OSP_OPTIONS="${mode}"
 
-    if [ "$mode" = "batch" ]; then
-        OSP_OPTIONS+=" --resolution 1024x1024"
+    if [ "$dev_mode" = true ]; then
+        OSP_OPTIONS+=" --resolution 256x256"
     else
-        OSP_OPTIONS+=" --resolution 1920x1080"
+        OSP_OPTIONS+=" --resolution 1024x1024"
     fi
 
     OSP_OPTIONS+=" --renderer pathtracer"
 
-    if [ "$mode" = "batch" ]; then
+    if [ "$mode" = "pht" ]; then
         OSP_OPTIONS+=" --spp ${spp}"
     fi
 
     OSP_OPTIONS+=" --pixelfilter 0"
-
     OSP_OPTIONS+=" --image ${scene}_${spp}spp"
     OSP_OPTIONS+=" --saveAlbedo"
     OSP_OPTIONS+=" --saveDepth"
     OSP_OPTIONS+=" --saveNormal"
-    #OSP_OPTIONS+=" --saveLayers"
     OSP_OPTIONS+=" --format png"
+
+    if [ "$mode" = "pht" ]; then
+        OSP_OPTIONS+=" --cameraGenerator fibonacci"
+        OSP_OPTIONS+=" --cameraGeneratorFlipYZ"
+        OSP_OPTIONS+=" --numFrames 100"
+        OSP_OPTIONS+=" --forceOverwrite"
+        OSP_OPTIONS+=" --jitter 0"
+        OSP_OPTIONS+=" --zoom 0"
+        OSP_OPTIONS+=" --outputPath images/${scene}_${spp}spp"
+    fi
 
     echo "Using options ${OSP_OPTIONS}"
 
@@ -51,7 +60,7 @@ run() {
             echo "Running ospStudio with ${scene}.sg"
             ${OSP_STUDIO_BASE} "$scene_file"
         else
-            echo "Error: ${scene_file} not found"
+            echo "Error: Scene at path ${scene_file} not found"
             return 1
         fi
     fi
@@ -64,32 +73,45 @@ run() {
     fi
 }
 
-ALLOWED_SCENES="wavelet teapot_cloud multi none"
-ALLOWED_SCENES_STR="${ALLOWED_SCENES// /, }"
-
-ALLOWED_MODES="gui batch pht"
-ALLOWED_MODES_STR="${ALLOWED_MODES// /, }"
+usage() {
+    echo "Usage: $0 -m|--mode <mode> -s|--scene <scene> [-p|--spp <spp>] [-d|--dev-mode]"
+    echo "  -m, --mode      Mode: gui or pht (required)"
+    echo "  -s, --scene     Scene name (required)"
+    echo "  -p, --spp       Samples per pixel (optional, default: 1)"
+    echo "  -d, --dev-mode  Enable development mode (optional flag)"
+    exit 1
+}
 
 main() {
-    if [ $# -lt 2 ]; then
-        echo "Usage: $0 <mode> <scene>"
-        echo "  mode: $ALLOWED_MODES_STR"
-        echo "  scene: $ALLOWED_SCENES_STR"
-        echo "  spp: samples per pixel. Default 1"
-        exit 1
-    fi
+    # Parse command line arguments
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+        -m | --mode)
+            mode="$2"
+            shift 2
+            ;;
+        -s | --scene)
+            scene="$2"
+            shift 2
+            ;;
+        -p | --spp)
+            spp="$2"
+            shift 2
+            ;;
+        -d | --dev-mode)
+            dev_mode=true
+            shift
+            ;;
+        *)
+            echo "Unknown option: $1"
+            usage
+            ;;
+        esac
+    done
 
-    local mode=$1
-    local scene=$2
-    local spp=$3
-
-    if [[ ! " $ALLOWED_MODES " =~ $mode ]]; then
-        echo "Error: mode must be one of : $ALLOWED_MODES_STR"
-        exit 1
-    fi
-
-    if [[ ! " $ALLOWED_SCENES " =~ $scene ]]; then
-        echo "Error: scene must be one of: $ALLOWED_SCENES_STR"
+    # mode must be one of: gui, pht
+    if [ "$mode" != "gui" ] && [ "$mode" != "pht" ]; then
+        echo "Error: mode must be one of : gui, pht"
         exit 1
     fi
 
@@ -98,7 +120,7 @@ main() {
     fi
 
     if build; then
-        run "$mode" "$scene" "$spp"
+        run
     else
         echo "Build failed"
         exit 1
