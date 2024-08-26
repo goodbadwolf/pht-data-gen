@@ -39,13 +39,24 @@ run() {
     if [ "$mode" = "pht" ]; then
         OSP_OPTIONS+=" --cameraGenerator fibonacci"
         OSP_OPTIONS+=" --cameraGeneratorFlipYZ"
-        OSP_OPTIONS+=" --numFrames 100"
+        OSP_OPTIONS+=" --numFrames 20"
         OSP_OPTIONS+=" --forceOverwrite"
         OSP_OPTIONS+=" --jitter 0"
         OSP_OPTIONS+=" --zoom 0"
         OSP_OPTIONS+=" --outputPath images/${scene}_${spp}spp"
     fi
 
+    additional_options_file="ospStudio-scenes/${scene}_opts.txt"
+    if [ -f "$additional_options_file" ]; then
+        OSP_OPTIONS+=" $(cat "$additional_options_file")"
+    fi
+
+    if [ "$mode" = "pht" ]; then
+        additional_options_file="ospStudio-scenes/${scene}_pht_opts.txt"
+        if [ -f "$additional_options_file" ]; then
+            OSP_OPTIONS+=" $(cat "$additional_options_file")"
+        fi
+    fi
     echo "Using options ${OSP_OPTIONS}"
 
     OSP_STUDIO_BASE="./ospray-studio/build/ospStudio"
