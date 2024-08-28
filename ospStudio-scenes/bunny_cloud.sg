@@ -34,7 +34,7 @@
                 "name": "bunny_cloud_importer",
                 "type": "IMPORTER",
                 "subType": "importer_vdb",
-                "filename": "/home/manish/projects/pixel_heal_thyself/data_gen/volumes/bunny_cloud.vdb",
+                "filename": "./volumes/bunny_cloud.vdb",
                 "children": [
                     {
                         "name": "bunny_cloud_rootXfm",
