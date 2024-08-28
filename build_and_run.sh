@@ -41,8 +41,6 @@ run() {
         OSP_OPTIONS+=" --cameraGeneratorFlipYZ"
         OSP_OPTIONS+=" --numFrames 20"
         OSP_OPTIONS+=" --forceOverwrite"
-        OSP_OPTIONS+=" --jitter 0"
-        OSP_OPTIONS+=" --zoom 0"
         OSP_OPTIONS+=" --outputPath images/${scene}_${spp}spp"
     fi
 
