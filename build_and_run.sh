@@ -13,6 +13,7 @@ mode="pht"
 scene="wavelet"
 spp="4"
 dev_mode=false
+start_frame="0"
 
 run() {
     OSP_OPTIONS="${mode}"
@@ -42,6 +43,7 @@ run() {
         OSP_OPTIONS+=" --numFrames 20"
         OSP_OPTIONS+=" --forceOverwrite"
         OSP_OPTIONS+=" --outputPath images/${scene}_${spp}spp"
+        OSP_OPTIONS+=" --startFrame ${start_frame}"
     fi
 
     additional_options_file="ospStudio-scenes/${scene}_opts.txt"
@@ -66,7 +68,7 @@ run() {
     else
         scene_file="ospStudio-scenes/${scene}.sg"
         if [ -f "$scene_file" ]; then
-            echo "Running ospStudio with ${scene}.sg"
+            echo "Running ospStudio with ${scene_file}"
             ${OSP_STUDIO_BASE} "$scene_file"
         else
             echo "Error: Scene at path ${scene_file} not found"
@@ -88,6 +90,7 @@ usage() {
     echo "  -s, --scene     Scene name (required)"
     echo "  -p, --spp       Samples per pixel (optional, default: 1)"
     echo "  -d, --dev-mode  Enable development mode (optional flag)"
+    echo "  -f, --start-frame Starting frame number (optional, default: 0)"
     exit 1
 }
 
@@ -105,6 +108,10 @@ main() {
             ;;
         -p | --spp)
             spp="$2"
+            shift 2
+            ;;
+        -f | --start-frame)
+            start_frame="$2"
             shift 2
             ;;
         -d | --dev-mode)
