@@ -21,7 +21,7 @@ run() {
     if [ "$dev_mode" = true ]; then
         OSP_OPTIONS+=" --resolution 256x256"
     else
-        OSP_OPTIONS+=" --resolution 1024x1024"
+        OSP_OPTIONS+=" --resolution 1280x720"
     fi
 
     OSP_OPTIONS+=" --renderer pathtracer"

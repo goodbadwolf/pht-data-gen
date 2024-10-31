@@ -1,1 +1,1 @@
---jitter 0 --zoom 0
+--jitter 0 --zoom 23
