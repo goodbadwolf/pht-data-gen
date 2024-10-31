@@ -30,8 +30,10 @@ run() {
         OSP_OPTIONS+=" --spp ${spp}"
     fi
 
+    spp_padded=$(printf "%06d" "$spp")
+
     OSP_OPTIONS+=" --pixelfilter 0"
-    OSP_OPTIONS+=" --image ${scene}_${spp}spp"
+    OSP_OPTIONS+=" --image ${scene}_${spp_padded}spp"
     OSP_OPTIONS+=" --saveAlbedo"
     OSP_OPTIONS+=" --saveDepth"
     OSP_OPTIONS+=" --saveNormal"
@@ -42,7 +44,7 @@ run() {
         OSP_OPTIONS+=" --cameraGeneratorFlipYZ"
         OSP_OPTIONS+=" --numFrames 20"
         OSP_OPTIONS+=" --forceOverwrite"
-        OSP_OPTIONS+=" --outputPath images/${scene}_${spp}spp"
+        OSP_OPTIONS+=" --outputPath images/${scene}_${spp_padded}spp"
         OSP_OPTIONS+=" --startFrame ${start_frame}"
     fi
 
@@ -129,10 +131,6 @@ main() {
     if [ "$mode" != "gui" ] && [ "$mode" != "pht" ]; then
         echo "Error: mode must be one of : gui, pht"
         exit 1
-    fi
-
-    if [ -z "$spp" ] || [ "$spp" -eq 0 ] 2>/dev/null; then
-        spp=1
     fi
 
     if build; then
