@@ -10,10 +10,12 @@ build() {
 }
 
 mode="pht"
-scene="wavelet"
+scene=""
 spp="4"
 dev_mode=false
+renderer="pathtracer"
 start_frame="0"
+end_frame="-1"
 
 run() {
     OSP_OPTIONS="${mode}"
@@ -24,16 +26,21 @@ run() {
         OSP_OPTIONS+=" --resolution 1280x720"
     fi
 
-    OSP_OPTIONS+=" --renderer pathtracer"
+    OSP_OPTIONS+=" --renderer ${renderer}"
 
-    if [ "$mode" = "pht" ]; then
+    if [ "$mode" = "pht" ] && [ "$renderer" = "pathtracer" ]; then
         OSP_OPTIONS+=" --spp ${spp}"
     fi
 
-    spp_padded=$(printf "%06d" "$spp")
+    if [ "$renderer" = "pathtracer" ]; then
+        spp_padded=$(printf "%06d" "$spp")
+        suffix="${spp_padded}spp"
+    else
+        suffix="scivis"
+    fi
 
     OSP_OPTIONS+=" --pixelfilter 0"
-    OSP_OPTIONS+=" --image ${scene}_${spp_padded}spp"
+    OSP_OPTIONS+=" --image ${scene}_${suffix}"
     OSP_OPTIONS+=" --saveAlbedo"
     OSP_OPTIONS+=" --saveDepth"
     OSP_OPTIONS+=" --saveNormal"
@@ -44,8 +51,9 @@ run() {
         OSP_OPTIONS+=" --cameraGeneratorFlipYZ"
         OSP_OPTIONS+=" --numFrames 20"
         OSP_OPTIONS+=" --forceOverwrite"
-        OSP_OPTIONS+=" --outputPath images/${scene}_${spp_padded}spp"
+        OSP_OPTIONS+=" --outputPath images/${scene}_${suffix}"
         OSP_OPTIONS+=" --startFrame ${start_frame}"
+        OSP_OPTIONS+=" --endFrame ${end_frame}"
     fi
 
     additional_options_file="ospStudio-scenes/${scene}_opts.txt"
@@ -62,16 +70,16 @@ run() {
     echo "Using options ${OSP_OPTIONS}"
 
     OSP_STUDIO_BASE="./ospray-studio/build/ospStudio"
-    OSP_STUDIO_BASE+=" ${OSP_OPTIONS}"
+    OSP_STUDIO_CMD="${OSP_STUDIO_BASE} ${OSP_OPTIONS}"
 
     if [ "$scene" = "none" ]; then
         echo "Running ospStudio without any file"
-        ${OSP_STUDIO_BASE}
+        ${OSP_STUDIO_CMD}
     else
         scene_file="ospStudio-scenes/${scene}.sg"
         if [ -f "$scene_file" ]; then
             echo "Running ospStudio with ${scene_file}"
-            ${OSP_STUDIO_BASE} "$scene_file"
+            ${OSP_STUDIO_CMD} "$scene_file"
         else
             echo "Error: Scene at path ${scene_file} not found"
             return 1
@@ -93,6 +101,7 @@ usage() {
     echo "  -p, --spp       Samples per pixel (optional, default: 1)"
     echo "  -d, --dev-mode  Enable development mode (optional flag)"
     echo "  -f, --start-frame Starting frame number (optional, default: 0)"
+    echo "  -e, --end-frame Ending frame number (optional, default: -1)"
     exit 1
 }
 
@@ -112,8 +121,16 @@ main() {
             spp="$2"
             shift 2
             ;;
+        -r | --renderer)
+            renderer="$2"
+            shift 2
+            ;;
         -f | --start-frame)
             start_frame="$2"
+            shift 2
+            ;;
+        -e | --end-frame)
+            end_frame="$2"
             shift 2
             ;;
         -d | --dev-mode)
@@ -130,6 +147,12 @@ main() {
     # mode must be one of: gui, pht
     if [ "$mode" != "gui" ] && [ "$mode" != "pht" ]; then
         echo "Error: mode must be one of : gui, pht"
+        exit 1
+    fi
+
+    # renderer must be one of: pathtracer, scivis
+    if [ "$renderer" != "pathtracer" ] && [ "$renderer" != "scivis" ]; then
+        echo "Error: renderer must be one of: pathtracer, scivi"
         exit 1
     fi
 
