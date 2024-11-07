@@ -34,7 +34,7 @@
                 "name": "hardy_global_importer",
                 "type": "IMPORTER",
                 "subType": "importer_vdb",
-                "filename": "/home/manish/projects/pixel_heal_thyself/data_gen/volumes/hardy_global.vdb",
+                "filename": "./volumes/hardy_global.vdb",
                 "children": [
                     {
                         "name": "hardy_global_rootXfm",

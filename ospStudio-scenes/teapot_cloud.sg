@@ -34,7 +34,7 @@
                 "name": "teapot_cloud_importer",
                 "type": "IMPORTER",
                 "subType": "importer_vdb",
-                "filename": "/home/manish/projects/pixel_heal_thyself/data_gen/volumes/teapot_cloud.vdb",
+                "filename": "./volumes/teapot_cloud.vdb",
                 "children": [
                     {
                         "name": "teapot_cloud_rootXfm",

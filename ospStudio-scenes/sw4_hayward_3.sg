@@ -34,7 +34,7 @@
                 "name": "sw4_hayward_importer",
                 "type": "IMPORTER",
                 "subType": "importer_vdb",
-                "filename": "/home/manish/projects/pixel_heal_thyself/data_gen/volumes/sw4_hayward.vdb",
+                "filename": "./volumes/sw4_hayward.vdb",
                 "children": [
                     {
                         "name": "sw4_hayward_rootXfm",
