@@ -95,13 +95,14 @@ run() {
 }
 
 usage() {
-    echo "Usage: $0 -m|--mode <mode> -s|--scene <scene> [-p|--spp <spp>] [-d|--dev-mode]"
+    echo "Usage: $0 -m|--mode <mode> -s|--scene <scene> [-p|--spp <spp>] [-d|--dev-mode] [-f|--start-frame <start_frame>] [-e|--end-frame <end_frame>] [-r|--renderer <renderer>]"
     echo "  -m, --mode      Mode: gui or pht (required)"
     echo "  -s, --scene     Scene name (required)"
     echo "  -p, --spp       Samples per pixel (optional, default: 1)"
     echo "  -d, --dev-mode  Enable development mode (optional flag)"
     echo "  -f, --start-frame Starting frame number (optional, default: 0)"
     echo "  -e, --end-frame Ending frame number (optional, default: -1)"
+    echo "  -r, --renderer  Renderer: pathtracer or scivis (optional, default: pathtracer)"
     exit 1
 }
 
@@ -152,7 +153,7 @@ main() {
 
     # renderer must be one of: pathtracer, scivis
     if [ "$renderer" != "pathtracer" ] && [ "$renderer" != "scivis" ]; then
-        echo "Error: renderer must be one of: pathtracer, scivi"
+        echo "Error: renderer must be one of: pathtracer, scivis"
         exit 1
     fi
 
