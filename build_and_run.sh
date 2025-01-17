@@ -23,7 +23,7 @@ run() {
     if [ "$dev_mode" = true ]; then
         OSP_OPTIONS+=" --resolution 256x256"
     else
-        OSP_OPTIONS+=" --resolution 1280x720"
+        OSP_OPTIONS+=" --resolution 512x512"
     fi
 
     OSP_OPTIONS+=" --renderer ${renderer}"
@@ -49,7 +49,7 @@ run() {
     if [ "$mode" = "pht" ]; then
         OSP_OPTIONS+=" --cameraGenerator fibonacci"
         OSP_OPTIONS+=" --cameraGeneratorFlipYZ"
-        OSP_OPTIONS+=" --numFrames 20"
+        OSP_OPTIONS+=" --numFrames 32"
         OSP_OPTIONS+=" --forceOverwrite"
         OSP_OPTIONS+=" --outputPath images/${scene}_${suffix}"
         OSP_OPTIONS+=" --startFrame ${start_frame}"

@@ -1,0 +1,4 @@
+Resolution: 256
+A: 10
+B: 1
+C: 0.1
