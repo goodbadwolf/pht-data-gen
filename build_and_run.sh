@@ -12,19 +12,42 @@ build() {
 mode="pht"
 scene=""
 spp="4"
-dev_mode=false
 renderer="pathtracer"
 start_frame="0"
 end_frame="-1"
+quality="720p"
+
+quality_to_resolution() {
+    case $1 in
+    256s)
+        echo "256x256"
+        ;;
+    512s)
+        echo "512x512"
+        ;;
+    1024s)
+        echo "1024x1024"
+        ;;
+    2048s)
+        echo "2048x2048"
+        ;;
+    720p)
+        echo "1280x720"
+        ;;
+    1080p)
+        echo "1920x1080"
+        ;;
+    4k)
+        echo "3840x2160"
+        ;;
+    esac
+}
 
 run() {
     OSP_OPTIONS="${mode}"
 
-    if [ "$dev_mode" = true ]; then
-        OSP_OPTIONS+=" --resolution 256x256"
-    else
-        OSP_OPTIONS+=" --resolution 512x512"
-    fi
+    resolution="$(quality_to_resolution "$quality")"
+    OSP_OPTIONS+=" --resolution ${resolution}"
 
     OSP_OPTIONS+=" --renderer ${renderer}"
 
@@ -99,10 +122,10 @@ usage() {
     echo "  -m, --mode      Mode: gui or pht (required)"
     echo "  -s, --scene     Scene name (required)"
     echo "  -p, --spp       Samples per pixel (optional, default: 1)"
-    echo "  -d, --dev-mode  Enable development mode (optional flag)"
+    echo "  -r, --renderer  Renderer: pathtracer or scivis (optional, default: pathtracer)"
     echo "  -f, --start-frame Starting frame number (optional, default: 0)"
     echo "  -e, --end-frame Ending frame number (optional, default: -1)"
-    echo "  -r, --renderer  Renderer: pathtracer or scivis (optional, default: pathtracer)"
+    echo "  -q, --quality   Quality: (optional, default: 720p)"
     exit 1
 }
 
@@ -134,9 +157,9 @@ main() {
             end_frame="$2"
             shift 2
             ;;
-        -d | --dev-mode)
-            dev_mode=true
-            shift
+        -q | --quality)
+            quality="$2"
+            shift 2
             ;;
         *)
             echo "Unknown option: $1"
@@ -154,6 +177,17 @@ main() {
     # renderer must be one of: pathtracer, scivis
     if [ "$renderer" != "pathtracer" ] && [ "$renderer" != "scivis" ]; then
         echo "Error: renderer must be one of: pathtracer, scivis"
+        exit 1
+    fi
+
+    known_qualities=("256s" "512s" "1024s" "2048s" "720p" "1080p" "4k")
+    quality_pattern="^($(
+        IFS="|"
+        echo "${known_qualities[*]}"
+    ))$"
+
+    if [[ ! "$quality" =~ $quality_pattern ]]; then
+        echo "Error: quality must be one of: ${known_qualities[*]}"
         exit 1
     fi
 
