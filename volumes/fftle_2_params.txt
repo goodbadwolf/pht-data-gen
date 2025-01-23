@@ -1,9 +1,0 @@
-gridResolution: 256x256x256
-A: 2
-B: 0.2
-C: 0.9
-t0: 0
-tf: 100
-dt: 0.1
-currentCheckpoint: 5
-numCheckpoints: 10
