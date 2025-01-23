@@ -1,13 +1,14 @@
 # Generators
 abc
 
-# Ospray Studio
+# Renderers and dependencies
 ospray
 ospray-studio
 ospray-studio-deps
-
-# PBRT
 pbrt
+VisRTX
+hayStack
+nvisii
 
 # Temp files
 imgui.ini
@@ -17,3 +18,6 @@ images/
 
 # Saved images
 output/
+
+# Data files
+volumes/
