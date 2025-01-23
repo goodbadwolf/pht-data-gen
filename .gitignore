@@ -10,8 +10,13 @@ VisRTX
 hayStack
 nvisii
 
+# Tools
+vdb2raw
+teem
+
 # Temp files
 imgui.ini
+talapas_images
 
 # Generated images
 images/
