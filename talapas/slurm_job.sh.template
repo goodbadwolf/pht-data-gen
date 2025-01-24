@@ -1,0 +1,23 @@
+#!/bin/bash
+#SBATCH --account=cdux
+#SBATCH --job-name=%%{job_name}
+#SBATCH --output=%%{job_logs_dir}/%%{job_name}_%a.out
+#SBATCH --error=%%{job_logs_dir}/%%{job_name}_%a.err
+#SBATCH --partition=compute
+#SBATCH --time=02:00:00
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task=64
+#SBATCH --mem-per-cpu=500M
+#SBATCH --array=%%{job_array}
+
+module load gcc/12
+
+spp_values=%%{spp_values}
+start_frame_values=%%{start_frame_values}
+end_frame_values=%%{end_frame_values}
+
+spp=${spp_values[$SLURM_ARRAY_TASK_ID]}
+start_frame=${start_frame_values[$SLURM_ARRAY_TASK_ID]}
+end_frame=${end_frame_values[$SLURM_ARRAY_TASK_ID]}
+
+./build_and_run.sh --mode pht --spp $spp --scene %%{scene} --start-frame $start_frame --end-frame $end_frame

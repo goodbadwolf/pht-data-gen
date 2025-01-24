@@ -26,3 +26,7 @@ output/
 
 # Data files
 volumes/
+
+# Talapas artefacts
+talapas_jobs/
+talapas_logs/
