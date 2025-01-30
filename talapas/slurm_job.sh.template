@@ -1,8 +1,8 @@
 #!/bin/bash
 #SBATCH --account=cdux
 #SBATCH --job-name=%%{job_name}
-#SBATCH --output=%%{job_logs_dir}/%%{job_name}_%a.out
-#SBATCH --error=%%{job_logs_dir}/%%{job_name}_%a.err
+#SBATCH --output=%%{job_logs_out_path}
+#SBATCH --error=%%{job_logs_err_path}
 #SBATCH --partition=compute
 #SBATCH --time=02:00:00
 #SBATCH --ntasks=1

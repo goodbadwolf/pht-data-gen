@@ -34,8 +34,8 @@ class SppSet:
                 f"Invalid parameter format. \nExpected format: spp=start,end \nGot: {param_str}"
             )
 
-    def to_hash_str(self) -> str:
-        return f"{self.spp}_{self.start_frame}_{self.end_frame}"
+    def hash_str(self) -> str:
+        return f"{self.spp}-{self.start_frame}_{self.end_frame}"
 
 
 class SppParser:
@@ -78,6 +78,17 @@ class SlurmScriptGenerator:
 
         script_vars = vars(args).copy()
         script_vars.update(self._generate_bash_arrays(args.spp_sets))
+        log_filename_fragment = "__".join(
+            [spp_set.hash_str() for spp_set in args.spp_sets]
+        )
+        log_out_filename = f"o_{args.job_name}_%a_{log_filename_fragment}.out"
+        script_vars["job_logs_out_path"] = os.path.join(
+            args.job_logs_dir, log_out_filename
+        )
+        log_err_filename = f"e_{args.job_name}_%a_{log_filename_fragment}.err"
+        script_vars["job_logs_err_path"] = os.path.join(
+            args.job_logs_dir, log_err_filename
+        )
 
         try:
             return self.template.substitute(script_vars)
