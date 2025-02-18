@@ -1,0 +1,1 @@
+--bgColor 0.01 0.01 0.01 1.0 --minContribution 0.5
