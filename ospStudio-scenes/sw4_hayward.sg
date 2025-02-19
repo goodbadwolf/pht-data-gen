@@ -1410,7 +1410,7 @@
                         "type": "PARAMETER",
                         "subType": "bool",
                         "sgOnly": false,
-                        "value": true
+                        "value": false
                     },
                     {
                         "name": "color",
@@ -1540,7 +1540,7 @@
                         "type": "PARAMETER",
                         "subType": "bool",
                         "sgOnly": false,
-                        "value": true
+                        "value": false
                     },
                     {
                         "name": "color",

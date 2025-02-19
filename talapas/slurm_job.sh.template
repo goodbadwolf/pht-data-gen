@@ -8,18 +8,22 @@
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=64
 #SBATCH --mem-per-cpu=500M
-#SBATCH --array=%%{job_array}
-#SBATCH --mail-type=BEGIN,END,FAIL
-#SBATCH --mail-user=mmathai@uoregon.edu
+#SBATCH --array=%%{job_array_str}
 
 module load gcc/12
 
-spp_values=%%{spp_values}
-start_frame_values=%%{start_frame_values}
-end_frame_values=%%{end_frame_values}
+sppsets_array=%%{sppsets_array}
 
-spp=${spp_values[$SLURM_ARRAY_TASK_ID]}
-start_frame=${start_frame_values[$SLURM_ARRAY_TASK_ID]}
-end_frame=${end_frame_values[$SLURM_ARRAY_TASK_ID]}
-
-./build_and_run.sh --mode pht --spp $spp --scene %%{scene} --start-frame $start_frame --end-frame $end_frame -q 512s
+# sppsets is a string of the form "spp=start,end spp=start,end ..."
+sppsets=${sppsets_array[$SLURM_ARRAY_TASK_ID]}
+# sppsets_list is an array of the form (spp=start,end spp=start,end ...)
+IFS=' ' read -r -a sppsets_list <<<"$sppsets"
+for sppset in "${sppsets_list[@]}"; do
+    IFS='=' read -r -a sppset_components <<<"$sppset"
+    spp=${sppset_components[0]}
+    IFS=',' read -r -a frame_range <<<"${sppset_components[1]}"
+    start_frame=${frame_range[0]}
+    end_frame=${frame_range[1]}
+    # echo "spp=$spp, start_frame=$start_frame, end_frame=$end_frame"
+    ./build_and_run.sh --mode pht --spp "$spp" --scene %%{scene} --start-frame "$start_frame" --end-frame "$end_frame" -q %%{quality}
+done
