@@ -378,7 +378,7 @@ class JobScheduler:
                 LOG.info(f"Elapsed: {elapsed}")
 
     def get_4spp_log_path(self) -> Optional[Path]:
-        pattern = f"{self.scene}.*4-0_{DEFAULT_FRAMES_COUNT}.*.out"
+        pattern = f"{self.scene}*4-0_{DEFAULT_FRAMES_COUNT}*.out"
         log_dir = Path(self.job_logs_dir)
         matches = list(log_dir.glob(pattern))
         return matches[0] if matches else None
@@ -423,16 +423,16 @@ class JobScheduler:
             LOG.info("Waiting for 4spp render to complete...")
             max_attempts = 3
             attempts = 0
-
             while attempts < max_attempts:
                 avg_time, count = self.calculate_avg_time()
-                if avg_time.to() > 0 and count == self.DEFAULT_FRAME_COUNT:
+                if avg_time.to() > 0 and count == DEFAULT_FRAMES_COUNT:
                     LOG.info("4spp render completed successfully")
                     return True
 
                 attempts += 1
                 LOG.info(f"Attempt {attempts}/{max_attempts}, waiting...")
-                self.sleep(DEFAULT_POLL_TIME * attempts)
+                GUESS_AVG_TIME = TimeInterval(20, "secs")
+                self.sleep(GUESS_AVG_TIME * DEFAULT_FRAMES_COUNT * attempts)
             LOG.error("Timeout waiting for 4spp render to complete")
             return False
 
@@ -515,7 +515,7 @@ class JobScheduler:
             return
         ret, out, err = generator.submit_script(script)
         if ret == 0:
-            LOG.info(f"Job {script.job_name} submitted successfully: {out}")
+            LOG.info(f"Job {script.job_name} submitted successfully: {out.strip()}")
         else:
             LOG.error(f"Job {script.job_name} submission failed: {err}")
             sys.exit(1)
