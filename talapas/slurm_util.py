@@ -1,47 +1,39 @@
 #!/usr/bin/env python3
 import argparse
-from dataclasses import dataclass, field
 import datetime
-from enum import StrEnum
-from functools import total_ordering
-import hashlib
 import logging
+from math import log
 import os
 import re
-from sqlite3 import Time
 import subprocess
 import sys
 import time
+import traceback
+from dataclasses import dataclass, field
+from enum import StrEnum
+from functools import total_ordering
 from pathlib import Path
 from string import Template
 from typing import Optional, Tuple
 
 
-# ---------------------------
-# UTILITIES
-# ---------------------------
 def ensure_dir_exists(dir_path: str):
     os.makedirs(dir_path, exist_ok=True)
-
-
-def create_md5_prefix(string: str, length=8) -> str:
-    return hashlib.md5(string.encode()).hexdigest()[:length]
 
 
 def init_logging(log_level: int, log_file: Optional[str] = None):
     logger = logging.getLogger(__name__)
     logger.setLevel(log_level)
+    time_format = "%Y-%m-%d %H:%M:%S"
     formatter = logging.Formatter(
-        "%(asctime)s - %(levelname)s - %(module)s: %(message)s"
+        f"%(asctime)s.%(msecs)03d - %(levelname)s - %(module)s{' ' + '[%(filename)s: %(lineno)d]' if log_level == logging.DEBUG else ''}: %(message)s",
+        datefmt=time_format,
     )
-    # Remove any existing handlers
     for handler in logger.handlers[:]:
         logger.removeHandler(handler)
-    # Console handler
     ch = logging.StreamHandler(sys.stdout)
     ch.setFormatter(formatter)
     logger.addHandler(ch)
-    # Optional file handler
     if log_file:
         fh = logging.FileHandler(log_file, mode="w")
         fh.setFormatter(formatter)
@@ -49,13 +41,9 @@ def init_logging(log_level: int, log_file: Optional[str] = None):
     return logger
 
 
-# Ensure common log directory exists
 ensure_dir_exists("batched_logs")
 
 
-# ---------------------------
-# MODELS
-# ---------------------------
 class TimeUnit(StrEnum):
     SECONDS = "secs"
     MILLISECONDS = "millis"
@@ -134,8 +122,9 @@ class SppSet:
     end_frame: int  # exclusive
     render_time: TimeInterval = field(default_factory=lambda: TimeInterval(0))
 
-    def hash_str(self) -> str:
-        return f"{self.spp}-{self.start_frame}_{self.end_frame}"
+    @property
+    def frame_count(self):
+        return self.end_frame - self.start_frame
 
 
 @dataclass
@@ -145,10 +134,7 @@ class SppSetList:
 
     def can_add_frame(self, frame: Frame) -> bool:
         new_render_time = self.render_time + frame.adjusted_render_time
-        # Exceeds max time limit
-        if new_render_time > DEFAULT_MAX_JOB_TIME:
-            return False
-        return True
+        return not (new_render_time > DEFAULT_MAX_JOB_TIME)
 
     def add_frame(self, frame: Frame) -> bool:
         if not self.can_add_frame(frame):
@@ -168,9 +154,13 @@ class SppSetList:
             self.sppsets[-1].end_frame = frame.num + 1
             self.sppsets[-1].render_time += frame.adjusted_render_time
         else:
-            LOG.error(f"Invalid frame: {frame}")
+            LOG.error(f"Failure to add invalid frame ({frame}) to SppSetList ({self})")
             return False
         return True
+
+    @property
+    def frame_count(self) -> int:
+        return sum(sppset.frame_count for sppset in self.sppsets)
 
     def is_empty(self) -> bool:
         return not self.sppsets
@@ -247,7 +237,9 @@ class SlurmScript:
                 f.write(self.content)
             os.chmod(self.filename, 0o755)
         except IOError as e:
-            LOG.error(f"Error writing script file: {e}")
+            LOG.error(f"Error saving job script file: {e}")
+
+            sys.stderr.write(traceback.format_exc())
             sys.exit(1)
 
 
@@ -299,17 +291,20 @@ class SlurmScriptGenerator:
             LOG.error(f"Missing required variable in template: {e}")
             sys.exit(1)
 
-    def _generate_bash_arrays(self, sppsets_array: list[SppSetList]) -> dict[str, str]:
+    def _generate_bash_arrays(
+        self, sppsets_array: list[list[SppSet]]
+    ) -> dict[str, str]:
         sppsets_bash_array = []
-        for i, sppsets in enumerate(sppsets_array):
+        for sppsets in sppsets_array:
             sppsets_bash_array.append(
                 " ".join(
                     [f"{spp.spp}={spp.start_frame},{spp.end_frame}" for spp in sppsets]
                 )
             )
-            LOG.debug(f"SPPSets: {i} => {sppsets_bash_array[-1]}")
+
+        stringified_sppsets = (f'"{sppsets}"' for sppsets in sppsets_bash_array)
         return {
-            "sppsets_array": f"({' '.join(f'"{sppsets}"' for sppsets in sppsets_bash_array)})",
+            "sppsets_array": f"({' '.join(stringified_sppsets)})",
         }
 
     def submit_script(self, script: SlurmScript) -> Tuple[int, str, str]:
@@ -330,11 +325,12 @@ class SlurmScriptGenerator:
 # ---------------------------
 # JOB SCHEDULER
 # ---------------------------
+DEFAULT_TIMER_SPP = 4
 DEFAULT_SPPS = [8, 16, 32, 64, 128, 256, 512, 1024]
 DEFAULT_FRAMES_COUNT = 32
-DEFAULT_POLL_TIME = TimeInterval(1, "mins")
-DEFAULT_JOB_ARRAY_SIZE = 10
+DEFAULT_POLL_TIME = TimeInterval(10, "mins")
 DEFAULT_MAX_JOB_TIME = TimeInterval(2, "hrs")
+DEFAULT_JOB_ARRAY_SIZE = 10
 DEFAULT_MAX_JOB_ARRAY_TIME = DEFAULT_MAX_JOB_TIME * DEFAULT_JOB_ARRAY_SIZE
 
 
@@ -358,42 +354,44 @@ class JobScheduler:
         ensure_dir_exists(self.job_scripts_dir)
         ensure_dir_exists(self.job_logs_dir)
 
-    def sleep(self, duration: TimeInterval):
+    def sleep(
+        self, duration: TimeInterval, heartbeat: TimeInterval = DEFAULT_POLL_TIME
+    ):
+        now = datetime.datetime.now()
+        end_time = now + datetime.timedelta(seconds=duration.to(TimeUnit.SECONDS))
+        LOG.info(
+            ("[DRY RUN] " if self.dry_run else "")
+            + f"Sleeping from {now} to {end_time}: {duration.to('mins'):.2f}mins"
+        )
         if self.dry_run:
-            now = datetime.datetime.now()
-            end_time = now + datetime.timedelta(seconds=duration.to("secs"))
-            LOG.info(
-                f"[DRY RUN] Would wait from {now} to {end_time} ({duration.to('mins'):.2f} mins)"
-            )
+            LOG.info("[DRY RUN] Actually sleeping for only 2 seconds")
             time.sleep(2)
         else:
-            start_time = datetime.datetime.now()
             remaining = duration
-            LOG.info(f"Sleeping for {duration.to('mins'):.2f} mins")
             while remaining > TimeInterval(0):
-                sleep_time = min(DEFAULT_POLL_TIME, remaining)
+                sleep_time = min(heartbeat, remaining)
                 time.sleep(sleep_time.to("secs"))
                 remaining -= sleep_time
-                elapsed = datetime.datetime.now() - start_time
-                LOG.info(f"Elapsed: {elapsed}")
+                LOG.info(f"[Heartbeat] Elapsed {sleep_time.to('mins'):.2f} mins")
+        LOG.info("Waking up...")
 
-    def get_4spp_log_path(self) -> Optional[Path]:
-        pattern = f"{self.scene}*4-0_{DEFAULT_FRAMES_COUNT}*.out"
+    def get_job_log_path(self, spp: int) -> Optional[Path]:
+        pattern = f"{self.scene}*{spp}-0_{DEFAULT_FRAMES_COUNT}*.out"
         log_dir = Path(self.job_logs_dir)
         matches = list(log_dir.glob(pattern))
         return matches[0] if matches else None
 
     def calculate_avg_time(
-        self, force_recalc: bool = False
+        self, spp: int, retry: bool = False
     ) -> Tuple[TimeInterval, int]:
-        def _calculate_avg_time(self) -> Tuple[TimeInterval, int]:
+        def calculate() -> Tuple[TimeInterval, int]:
             if self.dry_run:
                 mock_avg_time = TimeInterval(20, "secs")
                 LOG.info(
-                    f"[DRY RUN] Using mock avg time: {mock_avg_time.to('secs'):.2f} secs per frame"
+                    f"[DRY RUN] Using fixed average frame time: {mock_avg_time.to('secs'):.2f}secs"
                 )
                 return mock_avg_time, DEFAULT_FRAMES_COUNT
-            log_path = self.get_4spp_log_path()
+            log_path = self.get_job_log_path(spp)
             if not log_path or not log_path.is_file():
                 return TimeInterval(0), 0
             total = TimeInterval(0, TimeUnit.MILLISECONDS)
@@ -402,74 +400,75 @@ class JobScheduler:
             with open(log_path, "r") as f:
                 for line in f:
                     if match := pattern.search(line):
-                        total += TimeInterval(int(match.group(1)), "millis")
+                        total += TimeInterval(
+                            int(match.group(1)), TimeUnit.MILLISECONDS
+                        )
                         count += 1
-                        LOG.debug(f"Frame timing: {match.group(1)} ms")
             if count:
                 avg = total / count
-                LOG.info(
-                    f"Calculated avg frame time: {avg.to('secs'):.2f} secs from {count} frames"
-                )
+                LOG.info(f"Calculated average frame time: {avg.to('secs'):.2f}secs")
                 return avg, count
             return TimeInterval(0), 0
 
-        avg_time, count = _calculate_avg_time(self)
+        avg_time, count = calculate()
         if (
             avg_time.to(TimeUnit.SECONDS) > 0 and count == DEFAULT_FRAMES_COUNT
-        ) or not force_recalc:
+        ) or not retry:
             return avg_time, count
 
-        def wait_for_4spp_completion() -> bool:
-            LOG.info("Waiting for 4spp render to complete...")
+        def wait_for_timer_job_completion() -> bool:
+            LOG.info(f"Waiting for timer job({spp}) render to complete...")
             max_attempts = 3
             attempts = 0
             while attempts < max_attempts:
-                avg_time, count = self.calculate_avg_time()
+                avg_time, count = self.calculate_avg_time(DEFAULT_TIMER_SPP)
                 if avg_time.to() > 0 and count == DEFAULT_FRAMES_COUNT:
-                    LOG.info("4spp render completed successfully")
+                    LOG.info(f"Timer job({spp}) render completed successfully")
                     return True
 
                 attempts += 1
-                LOG.info(f"Attempt {attempts}/{max_attempts}, waiting...")
-                GUESS_AVG_TIME = TimeInterval(20, "secs")
+                LOG.info(
+                    f"Timer job({spp}): Attempt {attempts}/{max_attempts}, waiting..."
+                )
+                GUESS_AVG_TIME = TimeInterval(20, "secs") * spp / DEFAULT_TIMER_SPP
                 self.sleep(GUESS_AVG_TIME * DEFAULT_FRAMES_COUNT * attempts)
-            LOG.error("Timeout waiting for 4spp render to complete")
+            LOG.error(f"Timeout waiting for timer job({spp}) render to complete")
             return False
 
-        if avg_time.to("secs") == 0 or count != DEFAULT_FRAMES_COUNT:
-            LOG.info("No average time available. Submitting job for 4spp first.")
-            four_spp_job = Job(
+        if avg_time.to(TimeUnit.SECONDS) == 0 or count != DEFAULT_FRAMES_COUNT:
+            LOG.info(f"No average time available. Submitting timer job {spp}first.")
+            timer_job = Job(
                 scene=self.scene,
                 quality=self.quality,
             )
             for frame_num in range(DEFAULT_FRAMES_COUNT):
-                if not four_spp_job.add_frame(Frame(4, frame_num, TimeInterval(0))):
-                    LOG.error("Failed to add frame to 4spp job. Fatal error.")
+                if not timer_job.add_frame(Frame(spp, frame_num, TimeInterval(0))):
                     return TimeInterval(0), 0
 
-            self.submit_job(four_spp_job)
-            LOG.info("Waiting for 4spp job to complete")
-            if not wait_for_4spp_completion():
-                LOG.error("Failed to complete 4spp render. Exiting.")
+            self.submit_job(timer_job)
+            if not wait_for_timer_job_completion():
+                LOG.error(f"Failed to complete timer job({spp}). Exiting...")
                 return TimeInterval(0), 0
-            LOG.info("Recalculating average render time after 4spp completion")
-            avg_time_4spp, frame_count = _calculate_avg_time()
-            if avg_time_4spp.to() == 0 or frame_count == 0:
-                LOG.error("Failed to calculate average time after 4spp completion")
+            LOG.info(
+                f"Recalculating average render time after timer job({spp}) completion"
+            )
+            avg_time, frame_count = calculate()
+            if avg_time.to() == 0 or frame_count == 0:
+                LOG.error("Failed to calculate average time. Exiting...")
                 return TimeInterval(0), 0
-            return avg_time_4spp, frame_count
+            return avg_time, frame_count
 
     def run(self):
         LOG.info(
-            f"Starting render scheduler for scene: {self.scene}, quality: {self.quality}"
+            f"Starting job scheduler for scene: {self.scene}, quality: {self.quality}"
         )
-        avg_time, count = self.calculate_avg_time(force_recalc=True)
-        if avg_time.to("secs") == 0 or count != DEFAULT_FRAMES_COUNT:
+        avg_time, count = self.calculate_avg_time(spp=DEFAULT_TIMER_SPP, retry=True)
+        if avg_time.to(TimeUnit.SECONDS) == 0 or count != DEFAULT_FRAMES_COUNT:
             LOG.error("No average frame time available. Exiting...")
             return
 
         all_frames = [
-            Frame(spp, i, avg_time * (spp / 4))
+            Frame(spp, i, avg_time * (spp / DEFAULT_TIMER_SPP))
             for spp in DEFAULT_SPPS
             for i in range(DEFAULT_FRAMES_COUNT)
         ]
@@ -502,12 +501,12 @@ class JobScheduler:
             sppsets_list.sppsets for sppsets_list in job.sppsets_array
         ]
         args.dry_run = self.dry_run
-
+        frame_count = sum(sppset_list.frame_count for sppset_list in job.sppsets_array)
         generator = SlurmScriptGenerator(self.template_file)
         script = generator.generate_script(args)
         LOG.info(
             f"{'[DRY RUN] ' if self.dry_run else ''}"
-            + f"Generated SLURM script at {script.filename}"
+            + f"Generated SLURM script for {frame_count} total frames at {script.filename}"
         )
         script.save()
         if self.dry_run:

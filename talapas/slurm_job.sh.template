@@ -14,9 +14,7 @@ module load gcc/12
 
 sppsets_array=%%{sppsets_array}
 
-# sppsets is a string of the form "spp=start,end spp=start,end ..."
 sppsets=${sppsets_array[$SLURM_ARRAY_TASK_ID]}
-# sppsets_list is an array of the form (spp=start,end spp=start,end ...)
 IFS=' ' read -r -a sppsets_list <<<"$sppsets"
 for sppset in "${sppsets_list[@]}"; do
     IFS='=' read -r -a sppset_components <<<"$sppset"
@@ -24,6 +22,5 @@ for sppset in "${sppsets_list[@]}"; do
     IFS=',' read -r -a frame_range <<<"${sppset_components[1]}"
     start_frame=${frame_range[0]}
     end_frame=${frame_range[1]}
-    # echo "spp=$spp, start_frame=$start_frame, end_frame=$end_frame"
     ./build_and_run.sh --mode pht --spp "$spp" --scene %%{scene} --start-frame "$start_frame" --end-frame "$end_frame" -q %%{quality}
 done
